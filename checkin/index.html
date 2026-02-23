@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#16a34a">
+  <title>每日打卡 Pro</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons-png/calendar-check.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons-png/calendar-check.png" sizes="192x192">
+  <style>
+    html,body{height:100%}
+    .btn-tap:active{transform:scale(0.98)}
+    /* Hide scrollbar for habit list if needed */
+    .habit-grid::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="min-h-full bg-gradient-to-b from-gray-50 to-gray-100 text-gray-900 selection:bg-green-200 pb-24">
+  <div class="max-w-md mx-auto px-4 pt-6">
+    
+    <!-- Header & Date Picker -->
+    <header class="flex flex-col items-center mb-6">
+      <h1 class="text-2xl font-bold text-gray-800 mb-4">每日习惯打卡</h1>
+      
+      <div class="w-full bg-white rounded-2xl shadow-sm p-3 flex items-center justify-between ring-1 ring-gray-100">
+        <button id="prevDay" class="p-2 text-gray-500 hover:bg-gray-50 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <div class="flex items-center gap-2">
+          <input type="date" id="datePicker" class="bg-transparent font-medium text-lg text-center outline-none cursor-pointer text-gray-700">
+          <button id="todayBtn" class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded hidden">今天</button>
+        </div>
+        <button id="nextDay" class="p-2 text-gray-500 hover:bg-gray-50 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Stats Card -->
+    <section class="mb-6 space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-white p-4 rounded-2xl shadow-sm ring-1 ring-gray-100 text-center">
+          <div class="text-xs text-gray-500 uppercase tracking-wide">连续打卡</div>
+          <div class="text-3xl font-extrabold text-green-600 mt-1"><span id="streakCount">0</span> <span class="text-sm font-medium text-gray-400">天</span></div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl shadow-sm ring-1 ring-gray-100 text-center">
+          <div class="text-xs text-gray-500 uppercase tracking-wide">累计打卡</div>
+          <div class="text-3xl font-extrabold text-blue-600 mt-1"><span id="totalCount">0</span> <span class="text-sm font-medium text-gray-400">天</span></div>
+        </div>
+      </div>
+      
+      <!-- Extended Stats -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm ring-1 ring-gray-100 space-y-4">
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>本周 (周一~周日)</span>
+            <span id="weekStatText">0/7 天</span>
+          </div>
+          <div class="w-full bg-gray-100 rounded-full h-2.5">
+            <div id="weekStatBar" class="bg-green-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+        
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>本月</span>
+            <span id="monthStatText">0/30 天</span>
+          </div>
+          <div class="w-full bg-gray-100 rounded-full h-2.5">
+            <div id="monthStatBar" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+        
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>最近30天</span>
+            <span id="last30StatText">0/30 天</span>
+          </div>
+          <div class="w-full bg-gray-100 rounded-full h-2.5">
+            <div id="last30StatBar" class="bg-purple-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Habit Grid -->
+    <section>
+      <div class="flex justify-between items-center mb-3 px-1">
+        <h2 class="font-semibold text-gray-700">打卡项目</h2>
+        <button id="manageBtn" class="text-sm text-green-600 font-medium hover:text-green-700">管理项目</button>
+      </div>
+      
+      <div id="habitGrid" class="grid grid-cols-2 gap-3 sm:grid-cols-2">
+        <!-- Habits injected here -->
+      </div>
+      
+      <div id="emptyState" class="hidden text-center py-8 text-gray-400 text-sm">
+        暂无打卡项目，点击右上角添加
+      </div>
+    </section>
+
+    <!-- Individual Stats -->
+    <section class="mt-8 mb-6">
+      <h2 class="font-semibold text-gray-700 mb-3 px-1">单项统计详情</h2>
+      <div id="individualStats" class="grid gap-3 sm:grid-cols-2">
+        <!-- Injected via JS -->
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Management Modal -->
+  <div id="manageModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-xl transform transition-all max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold">管理打卡项目</h3>
+        <button id="closeModal" class="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <div class="flex gap-2 mb-4">
+        <input type="text" id="newHabitInput" placeholder="输入新项目名称 (如: 喝水)" class="flex-1 border-gray-300 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-green-500">
+        <button id="addHabitBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 whitespace-nowrap">添加</button>
+      </div>
+      
+      <div class="overflow-y-auto flex-1 pr-1 -mr-1">
+        <ul id="habitList" class="space-y-2">
+          <!-- List items -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORE_KEY = 'checkin_v2_data';
+    const habitGrid = document.getElementById('habitGrid');
+    const datePicker = document.getElementById('datePicker');
+    const todayBtn = document.getElementById('todayBtn');
+    const streakCount = document.getElementById('streakCount');
+    const totalCount = document.getElementById('totalCount');
+    const weekStatText = document.getElementById('weekStatText');
+    const weekStatBar = document.getElementById('weekStatBar');
+    const monthStatText = document.getElementById('monthStatText');
+    const monthStatBar = document.getElementById('monthStatBar');
+    const last30StatText = document.getElementById('last30StatText');
+    const last30StatBar = document.getElementById('last30StatBar');
+    const individualStats = document.getElementById('individualStats');
+    const manageModal = document.getElementById('manageModal');
+    const habitList = document.getElementById('habitList');
+    const newHabitInput = document.getElementById('newHabitInput');
+    
+    // Default Data
+    const defaultHabits = ['不喝酒', '吃保健品', '走路三公里', '洗脸刷牙'];
+    
+    // State
+    let state = {
+      habits: [],
+      records: {} // { "YYYY-MM-DD": ["habit1", "habit2"] }
+    };
+    
+    let currentDate = getTodayStr();
+
+    // Helpers
+    function pad(n) { return n < 10 ? '0' + n : n; }
+    function getTodayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+    function formatDate(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+
+    // Load/Save
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) {
+          state = JSON.parse(raw);
+          // Ensure structure
+          if (!state.habits) state.habits = [];
+          if (!state.records) state.records = {};
+        } else {
+          // Init defaults
+          state.habits = [...defaultHabits];
+          state.records = {};
+          saveData();
+        }
+      } catch (e) {
+        console.error('Load error', e);
+        state = { habits: [...defaultHabits], records: {} };
+      }
+    }
+    
+    function saveData() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      updateStats();
+    }
+
+    // Logic
+    function toggleHabit(habit) {
+      const dateKey = currentDate;
+      if (!state.records[dateKey]) {
+        state.records[dateKey] = [];
+      }
+      
+      const idx = state.records[dateKey].indexOf(habit);
+      if (idx > -1) {
+        state.records[dateKey].splice(idx, 1);
+      } else {
+        state.records[dateKey].push(habit);
+      }
+      
+      // Cleanup empty days
+      if (state.records[dateKey].length === 0) {
+        delete state.records[dateKey];
+      }
+      
+      saveData();
+      renderGrid();
+      animateButton(habit);
+    }
+
+    function addHabit(name) {
+      if (!name || state.habits.includes(name)) return;
+      state.habits.push(name);
+      saveData();
+      renderGrid();
+      renderManageList();
+      newHabitInput.value = '';
+    }
+
+    function removeHabit(name) {
+      if (confirm(`确定要删除“${name}”吗？历史记录将保留但不再显示。`)) {
+        state.habits = state.habits.filter(h => h !== name);
+        saveData();
+        renderGrid();
+        renderManageList();
+        renderIndividualStats();
+      }
+    }
+
+    // Stats
+    function updateStats() {
+      // Total days with at least one checkin
+      const total = Object.keys(state.records).length;
+      totalCount.textContent = total;
+      
+      // Streak
+      let streak = 0;
+      let d = new Date();
+      // Check today first, if not checked, maybe streak ended yesterday
+      // Actually common logic: include today if checked, else start from yesterday
+      let checkDate = new Date();
+      let dateStr = formatDate(checkDate);
+      
+      // If today has records, count it
+      if (state.records[dateStr] && state.records[dateStr].length > 0) {
+        streak++;
+      }
+      
+      // Go back
+      while (true) {
+        checkDate.setDate(checkDate.getDate() - 1);
+        dateStr = formatDate(checkDate);
+        if (state.records[dateStr] && state.records[dateStr].length > 0) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+      streakCount.textContent = streak;
+
+      // Extended Stats
+      updateExtendedStats();
+    }
+    
+    function updateExtendedStats() {
+      const today = new Date();
+      
+      // 1. This Week (Monday to Sunday)
+      const currentDay = today.getDay() || 7; // 1 (Mon) - 7 (Sun)
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - currentDay + 1);
+      
+      let weekCount = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const s = formatDate(d);
+        if (state.records[s] && state.records[s].length > 0) weekCount++;
+      }
+      weekStatText.textContent = `${weekCount}/7 天`;
+      weekStatBar.style.width = `${(weekCount / 7) * 100}%`;
+      
+      // 2. This Month
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      
+      let monthCount = 0;
+      for (let i = 1; i <= daysInMonth; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth(), i);
+        const s = formatDate(d);
+        if (state.records[s] && state.records[s].length > 0) monthCount++;
+      }
+      monthStatText.textContent = `${monthCount}/${daysInMonth} 天`;
+      monthStatBar.style.width = `${(monthCount / daysInMonth) * 100}%`;
+      
+      // 3. Last 30 Days
+      let last30Count = 0;
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const s = formatDate(d);
+        if (state.records[s] && state.records[s].length > 0) last30Count++;
+      }
+      last30StatText.textContent = `${last30Count}/30 天`;
+      last30StatBar.style.width = `${(last30Count / 30) * 100}%`;
+
+      // 4. Individual Stats
+      renderIndividualStats();
+    }
+
+    function renderIndividualStats() {
+      individualStats.innerHTML = '';
+      const today = new Date();
+      
+      // Calculate date ranges once
+      const currentDay = today.getDay() || 7;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - currentDay + 1);
+      
+      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      
+      state.habits.forEach(habit => {
+        let weekCount = 0;
+        let monthCount = 0;
+        
+        // Week Check
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(monday);
+          d.setDate(monday.getDate() + i);
+          const s = formatDate(d);
+          if (state.records[s] && state.records[s].includes(habit)) weekCount++;
+        }
+        
+        // Month Check
+        for (let i = 1; i <= daysInMonth; i++) {
+          const d = new Date(today.getFullYear(), today.getMonth(), i);
+          const s = formatDate(d);
+          if (state.records[s] && state.records[s].includes(habit)) monthCount++;
+        }
+        
+        const card = document.createElement('div');
+        card.className = 'bg-white p-4 rounded-xl shadow-sm ring-1 ring-gray-100';
+        card.innerHTML = `
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-1 h-4 bg-green-500 rounded-full"></div>
+            <h3 class="font-bold text-gray-800 truncate">${habit}</h3>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>本周</span>
+                <span class="font-medium">${weekCount}/7</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-1.5">
+                <div class="bg-green-500 h-1.5 rounded-full transition-all" style="width: ${(weekCount/7)*100}%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>本月</span>
+                <span class="font-medium">${monthCount}/${daysInMonth}</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-1.5">
+                <div class="bg-blue-500 h-1.5 rounded-full transition-all" style="width: ${(monthCount/daysInMonth)*100}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+        individualStats.appendChild(card);
+      });
+    }
+
+    // Rendering
+    function renderGrid() {
+      habitGrid.innerHTML = '';
+      const dayRecords = state.records[currentDate] || [];
+      
+      if (state.habits.length === 0) {
+        document.getElementById('emptyState').classList.remove('hidden');
+      } else {
+        document.getElementById('emptyState').classList.add('hidden');
+      }
+
+      state.habits.forEach(habit => {
+        const isChecked = dayRecords.includes(habit);
+        const btn = document.createElement('button');
+        btn.className = `btn-tap relative flex items-center justify-between p-4 rounded-xl transition-all shadow-sm ring-1 ring-inset ${
+          isChecked 
+            ? 'bg-green-600 text-white ring-green-600 shadow-green-200' 
+            : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'
+        }`;
+        btn.dataset.habit = habit;
+        btn.onclick = () => toggleHabit(habit);
+        
+        btn.innerHTML = `
+          <span class="font-semibold text-lg truncate pr-2">${habit}</span>
+          <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            isChecked ? 'border-white bg-white/20' : 'border-gray-300'
+          }">
+            ${isChecked ? '<svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>' : ''}
+          </div>
+        `;
+        habitGrid.appendChild(btn);
+      });
+    }
+
+    function renderManageList() {
+      habitList.innerHTML = '';
+      state.habits.forEach((habit, index) => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between bg-gray-50 p-3 rounded-lg';
+        
+        const isFirst = index === 0;
+        const isLast = index === state.habits.length - 1;
+
+        li.innerHTML = `
+          <span class="font-medium text-gray-700 truncate flex-1">${habit}</span>
+          <div class="flex items-center gap-1">
+            <button onclick="moveHabit(${index}, -1)" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors ${isFirst ? 'invisible' : ''}" title="上移">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+            </button>
+            <button onclick="moveHabit(${index}, 1)" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors ${isLast ? 'invisible' : ''}" title="下移">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <div class="w-px h-4 bg-gray-300 mx-1"></div>
+            <button onclick="removeHabit('${habit}')" class="text-red-500 hover:bg-red-100 p-1.5 rounded-md transition-colors" title="删除">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+          </div>
+        `;
+        habitList.appendChild(li);
+      });
+    }
+
+    function moveHabit(index, direction) {
+      if (direction === -1 && index > 0) {
+        // Move up
+        [state.habits[index], state.habits[index - 1]] = [state.habits[index - 1], state.habits[index]];
+      } else if (direction === 1 && index < state.habits.length - 1) {
+        // Move down
+        [state.habits[index], state.habits[index + 1]] = [state.habits[index + 1], state.habits[index]];
+      }
+      saveData();
+      renderGrid();
+      renderManageList();
+      renderIndividualStats();
+    }
+
+    function animateButton(habit) {
+      // Simple pulse animation on the specific button
+      const btn = document.querySelector(`button[data-habit="${habit}"]`);
+      if (btn) {
+        btn.animate([
+          { transform: 'scale(1)' },
+          { transform: 'scale(0.97)' },
+          { transform: 'scale(1)' }
+        ], { duration: 150 });
+      }
+    }
+
+    // Date Picker Logic
+    function setDate(str) {
+      currentDate = str;
+      datePicker.value = str;
+      const today = getTodayStr();
+      if (str === today) {
+        todayBtn.classList.add('hidden');
+        datePicker.classList.add('text-green-700', 'font-bold');
+        datePicker.classList.remove('text-gray-700');
+      } else {
+        todayBtn.classList.remove('hidden');
+        datePicker.classList.remove('text-green-700', 'font-bold');
+        datePicker.classList.add('text-gray-700');
+      }
+      renderGrid();
+    }
+
+    // Init
+    loadData();
+    setDate(getTodayStr());
+
+    // Event Listeners
+    datePicker.addEventListener('change', (e) => setDate(e.target.value));
+    
+    document.getElementById('prevDay').addEventListener('click', () => {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 1);
+      setDate(formatDate(d));
+    });
+    
+    document.getElementById('nextDay').addEventListener('click', () => {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + 1);
+      setDate(formatDate(d));
+    });
+    
+    todayBtn.addEventListener('click', () => setDate(getTodayStr()));
+
+    // Modal
+    const manageBtn = document.getElementById('manageBtn');
+    const closeModal = document.getElementById('closeModal');
+    const addHabitBtn = document.getElementById('addHabitBtn');
+
+    manageBtn.onclick = () => {
+      renderManageList();
+      manageModal.classList.remove('hidden');
+    };
+    
+    closeModal.onclick = () => manageModal.classList.add('hidden');
+    
+    manageModal.onclick = (e) => {
+      if (e.target === manageModal) manageModal.classList.add('hidden');
+    };
+
+    addHabitBtn.onclick = () => addHabit(newHabitInput.value.trim());
+    
+    // Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
