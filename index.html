@@ -161,6 +161,8 @@
     };
     
     let currentDate = getTodayStr();
+    const isGithubPages = location.hostname.endsWith('github.io');
+    const canSync = !isGithubPages;
 
     // Helpers
     function pad(n) { return n < 10 ? '0' + n : n; }
@@ -173,29 +175,62 @@
     }
 
     // Load/Save
-    function loadData() {
+    async function loadData() {
+      // 1. Load from LocalStorage first for speed
       try {
         const raw = localStorage.getItem(STORE_KEY);
         if (raw) {
           state = JSON.parse(raw);
-          // Ensure structure
           if (!state.habits) state.habits = [];
           if (!state.records) state.records = {};
         } else {
-          // Init defaults
           state.habits = [...defaultHabits];
           state.records = {};
-          saveData();
         }
       } catch (e) {
-        console.error('Load error', e);
+        console.error('Local load error', e);
         state = { habits: [...defaultHabits], records: {} };
+      }
+      
+      // Render immediately with local data
+      updateStats();
+      renderGrid();
+
+      if (canSync) {
+        try {
+          const res = await fetch('/api/data');
+          if (res.ok) {
+            const serverData = await res.json();
+            const serverHasData = serverData.habits && serverData.habits.length > 0;
+            if (serverHasData) {
+              state = serverData;
+              localStorage.setItem(STORE_KEY, JSON.stringify(state));
+              updateStats();
+              renderGrid();
+              if (document.getElementById('individualStats').innerHTML !== '') {
+                 renderIndividualStats();
+              }
+            } else {
+              saveData();
+            }
+          }
+        } catch (e) {
+          console.warn('Server sync failed:', e);
+        }
       }
     }
     
     function saveData() {
       localStorage.setItem(STORE_KEY, JSON.stringify(state));
       updateStats();
+      
+      if (canSync) {
+        fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state)
+        }).catch(e => console.warn('Upload failed', e));
+      }
     }
 
     // Logic
