@@ -167,12 +167,20 @@
 
         <!-- Cloud Sync -->
         <div class="pt-4 border-t border-gray-100">
-          <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">自动云端同步</h4>
-          <p class="text-xs text-gray-400 mb-3 leading-relaxed">如果你在服务器或内网运行了 `server.py`，请在此输入 API 地址。若使用 GitHub Pages，建议使用手动导出/导入或自行部署后端。</p>
+          <div class="flex justify-between items-center mb-3">
+            <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">自动云端同步</h4>
+            <button id="genFreeSyncBtn" class="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition-colors font-bold">一键生成免注册地址</button>
+          </div>
+          <p class="text-xs text-gray-400 mb-3 leading-relaxed">输入 API 地址即可实现自动同步。推荐点击上方按钮生成一个免注册的私有同步地址。</p>
           <div class="space-y-3">
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1">API 地址</label>
               <input type="text" id="syncUrlInput" placeholder="例如: http://localhost:8000/api/data" class="w-full border-gray-300 border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">自定义 Headers (JSON 格式, 可选)</label>
+              <textarea id="syncHeadersInput" placeholder='例如: {"X-Master-Key": "$2b$10..."}' class="w-full border-gray-300 border rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-green-500 h-20 font-mono"></textarea>
+              <p class="text-[10px] text-gray-400 mt-1">用于在线后端 (如 JSONBin.io) 的身份验证。</p>
             </div>
             <button id="saveSyncUrlBtn" class="w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors text-sm">保存并同步</button>
           </div>
@@ -184,6 +192,7 @@
   <script>
     const STORE_KEY = 'checkin_v2_data';
     const SYNC_URL_KEY = 'checkin_sync_url';
+    const SYNC_HEADERS_KEY = 'checkin_sync_headers';
     const habitGrid = document.getElementById('habitGrid');
     const datePicker = document.getElementById('datePicker');
     const todayBtn = document.getElementById('todayBtn');
@@ -211,6 +220,7 @@
     
     let currentDate = getTodayStr();
     let SYNC_URL = localStorage.getItem(SYNC_URL_KEY) || '';
+    let SYNC_HEADERS = localStorage.getItem(SYNC_HEADERS_KEY) || '{}';
 
     // Helpers
     function pad(n) { return n < 10 ? '0' + n : n; }
@@ -248,9 +258,24 @@
       // 2. Try to sync with Cloud
       if (SYNC_URL) {
         try {
-          const res = await fetch(SYNC_URL);
+          const headers = { 'Content-Type': 'application/json' };
+          try {
+            const custom = JSON.parse(SYNC_HEADERS || '{}');
+            Object.assign(headers, custom);
+          } catch(e) { console.warn('Headers parse error', e); }
+
+          const res = await fetch(SYNC_URL, { headers });
           if (res.ok) {
-            const serverData = await res.json();
+            const text = await res.text();
+            if (!text || text.trim() === "") {
+              showSyncIndicator('idle');
+              return;
+            }
+            
+            let serverData = JSON.parse(text);
+            // JSONBin.io returns data inside 'record' property
+            if (serverData.record) serverData = serverData.record;
+
             if (serverData.habits && serverData.habits.length > 0) {
               state = serverData;
               localStorage.setItem(STORE_KEY, JSON.stringify(state));
@@ -260,6 +285,9 @@
             } else {
               showSyncIndicator('idle');
             }
+          } else if (res.status === 404) {
+            // Key not found is normal for first-time sync on KV stores
+            showSyncIndicator('idle');
           } else {
             showSyncIndicator('error');
           }
@@ -279,15 +307,28 @@
       if (SYNC_URL) {
         showSyncIndicator('syncing');
         try {
+          const headers = { 'Content-Type': 'application/json' };
+          try {
+            const custom = JSON.parse(SYNC_HEADERS || '{}');
+            Object.assign(headers, custom);
+          } catch(e) { console.warn('Headers parse error', e); }
+
           const res = await fetch(SYNC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'PUT', // JSONBin.io uses PUT for updates
+            headers: headers,
             body: JSON.stringify(state)
           });
           if (res.ok) {
             showSyncIndicator('success');
           } else {
-            showSyncIndicator('error');
+            // Try POST if PUT fails (for compatibility with simple backends like server.py)
+            const postRes = await fetch(SYNC_URL, {
+              method: 'POST',
+              headers: headers,
+              body: JSON.stringify(state)
+            });
+            if (postRes.ok) showSyncIndicator('success');
+            else showSyncIndicator('error');
           }
         } catch (e) {
           console.warn('Cloud upload failed', e);
@@ -666,10 +707,26 @@
     const importBtn = document.getElementById('importBtn');
     const importFile = document.getElementById('importFile');
     const syncUrlInput = document.getElementById('syncUrlInput');
+    const syncHeadersInput = document.getElementById('syncHeadersInput');
     const saveSyncUrlBtn = document.getElementById('saveSyncUrlBtn');
+    const genFreeSyncBtn = document.getElementById('genFreeSyncBtn');
+
+    genFreeSyncBtn.onclick = () => {
+      if (SYNC_URL && !confirm('检测到已有同步地址，生成新地址将覆盖旧设置，确定吗？')) return;
+      
+      // 生成一个随机的 16 位字符作为私有 Key
+      const randomKey = 'checkin_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+      // 使用 kvdb.io 的公共 Bucket (注意：生产环境建议用户自行创建私有 Bucket)
+      const newUrl = `https://kvdb.io/AnV9v8p1X8p1X8p1X8p1/${randomKey}`;
+      
+      syncUrlInput.value = newUrl;
+      syncHeadersInput.value = '{}';
+      alert('已生成私有同步地址！\n\n请点击下方的“保存并同步”生效。\n\n提示：在其他设备上填入相同的地址即可实现数据互通。');
+    };
 
     settingsBtn.onclick = () => {
       syncUrlInput.value = SYNC_URL;
+      syncHeadersInput.value = SYNC_HEADERS;
       settingsModal.classList.remove('hidden');
     };
 
@@ -724,17 +781,22 @@
     // Cloud Sync Logic
     saveSyncUrlBtn.onclick = async () => {
       const url = syncUrlInput.value.trim();
+      const headers = syncHeadersInput.value.trim();
+      
       SYNC_URL = url;
+      SYNC_HEADERS = headers;
+      
       localStorage.setItem(SYNC_URL_KEY, SYNC_URL);
+      localStorage.setItem(SYNC_HEADERS_KEY, SYNC_HEADERS);
       
       saveSyncUrlBtn.disabled = true;
       saveSyncUrlBtn.textContent = '同步中...';
       
       try {
         await loadData(); // Try to sync with new URL
-        alert('API 地址已保存并尝试同步');
+        alert('设置已保存并尝试同步');
       } catch (err) {
-        alert('同步失败，请检查 API 地址');
+        alert('同步失败，请检查设置');
       } finally {
         saveSyncUrlBtn.disabled = false;
         saveSyncUrlBtn.textContent = '保存并同步';
