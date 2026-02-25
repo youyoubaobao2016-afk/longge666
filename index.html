@@ -191,8 +191,8 @@
 
   <script>
     const STORE_KEY = 'checkin_v2_data';
-    const SYNC_URL_KEY = 'checkin_sync_url';
-    const SYNC_HEADERS_KEY = 'checkin_sync_headers';
+    const SYNC_URL_KEY = 'checkin_sync_url_v2';
+    const SYNC_HEADERS_KEY = 'checkin_sync_headers_v2';
     const habitGrid = document.getElementById('habitGrid');
     const datePicker = document.getElementById('datePicker');
     const todayBtn = document.getElementById('todayBtn');
@@ -219,8 +219,9 @@
     };
     
     let currentDate = getTodayStr();
-    let SYNC_URL = localStorage.getItem(SYNC_URL_KEY) || '';
-    let SYNC_HEADERS = localStorage.getItem(SYNC_HEADERS_KEY) || '{}';
+    // 默认 Gitee 配置 (自动填入)
+    let SYNC_URL = localStorage.getItem(SYNC_URL_KEY) || 'https://gitee.com/api/v5/repos/longge666/checkin-data/contents/data.json';
+    let SYNC_HEADERS = localStorage.getItem(SYNC_HEADERS_KEY) || '{"Authorization": "token 8ef1b27f2d45d54128170ba6f80f5a19"}';
 
     // Helpers
     function pad(n) { return n < 10 ? '0' + n : n; }
@@ -266,14 +267,20 @@
 
           const res = await fetch(SYNC_URL, { headers });
           if (res.ok) {
-            const text = await res.text();
-            if (!text || text.trim() === "") {
-              showSyncIndicator('idle');
-              return;
+            const data = await res.json();
+            let serverData;
+            
+            // 适配 Gitee API (数据在 content 字段且是 Base64 编码)
+            if (data.content && data.encoding === 'base64') {
+              const decoded = decodeURIComponent(escape(atob(data.content)));
+              serverData = JSON.parse(decoded);
+              // 保存当前文件的 sha 供更新使用
+              window._gitee_sha = data.sha;
+            } else {
+              serverData = data;
             }
             
-            let serverData = JSON.parse(text);
-            // JSONBin.io returns data inside 'record' property
+            // JSONBin.io 兼容
             if (serverData.record) serverData = serverData.record;
 
             if (serverData.habits && serverData.habits.length > 0) {
@@ -313,22 +320,41 @@
             Object.assign(headers, custom);
           } catch(e) { console.warn('Headers parse error', e); }
 
+          // 准备发送的数据
+          let bodyData = JSON.stringify(state);
+          
+          // 如果是 Gitee，需要特殊格式
+          if (SYNC_URL.includes('gitee.com')) {
+            bodyData = JSON.stringify({
+              message: "update data",
+              content: btoa(unescape(encodeURIComponent(JSON.stringify(state)))),
+              sha: window._gitee_sha
+            });
+          }
+
           const res = await fetch(SYNC_URL, {
-            method: 'PUT', // JSONBin.io uses PUT for updates
+            method: 'PUT', 
             headers: headers,
-            body: JSON.stringify(state)
+            body: bodyData
           });
+          
           if (res.ok) {
+            const data = await res.json();
+            if (data.content && data.content.sha) window._gitee_sha = data.content.sha;
             showSyncIndicator('success');
           } else {
-            // Try POST if PUT fails (for compatibility with simple backends like server.py)
-            const postRes = await fetch(SYNC_URL, {
-              method: 'POST',
-              headers: headers,
-              body: JSON.stringify(state)
-            });
-            if (postRes.ok) showSyncIndicator('success');
-            else showSyncIndicator('error');
+            // 如果不是 Gitee，尝试 POST 回退
+            if (!SYNC_URL.includes('gitee.com')) {
+              const postRes = await fetch(SYNC_URL, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(state)
+              });
+              if (postRes.ok) showSyncIndicator('success');
+              else showSyncIndicator('error');
+            } else {
+              showSyncIndicator('error');
+            }
           }
         } catch (e) {
           console.warn('Cloud upload failed', e);
